@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "J.A.R.V.I.S",
+  "short_name": "JARVIS",
+  "description": "Telefonundan J.A.R.V.I.S ile sesli konuş.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#010a0a",
+  "theme_color": "#010a0a",
+  "icons": [
+    {
+      "src": "/static/jarvis-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+.claude/
+.swift-cache/
+.swift-home/
+
+# Secrets and private machine credentials — never commit these.
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+
+# Kisisel veriler — ASLA paylasilmaz
+config/api_keys.json
+memory/memory.json
+memory/phone_book.json
+memory/calendar_store.json
+memory/jarvis_calendar.ics
+memory/daily_life.sqlite3*
+memory/routines.json
+memory/*.sqlite3*
+memory/*.json
+!memory/*.example.json
+memory/*.ics
+memory/*.lock
+config/google_oauth_client.json
+backups/
+logs/
+.venv311/
+
+# Local diagnostics and user-generated research/work data can contain prompts.
+*.log
+research/interactions.json
+research/interactions.lock
+research/reports/
+work/*.sqlite3*
+work/reports/
+
+jarvis.log
+jarvis_error.log
+jarvis_tani.log
+
+# Web/telefon surumu — uretilen kisisel artefaktlar
+jarvis_web/web_config.json
+jarvis_web/certs/
+
+# PyInstaller ciktilari (jarvis.spec PAYLASILIR, ciktilari paylasilmaz)
+build/
+dist/
+*.manifest
+
+# Uretilen ikon
+Icon/JARVIS.ico
+
+# cloudflared ikilisi (51 MB) — depoya konmaz, build_exe.ps1 indirir.
+# CLOUDFLARED_LICENSE.txt PAYLASILIR (Apache-2.0 atif sarti).
+cloudflared.exe
+
+# Duplicate archive; the extracted Vosk model folder is the runtime asset.
+models/vosk-model-small-en-us-0.15.zip
