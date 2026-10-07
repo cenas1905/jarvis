@@ -37,7 +37,7 @@ from google import genai
 from google.genai import types
 
 from app_config import get_app_config_value, save_app_config
-from audio_runtime import configure_live, pcm_chunks, offer_latest, clear_queue, SignalMonitor, audio_event, mix_pcm16, mix_phone_audio, choose_local_audio_device
+from audio_runtime import configure_live, pcm_chunks, offer_latest, clear_queue, SignalMonitor, audio_event, mix_pcm16, mix_phone_audio, choose_local_audio_device, audio_io_call
 from ui import JarvisUI
 from wake_word import WakeWordListener
 from actions.tts import speak_text
@@ -1156,7 +1156,7 @@ class JarvisLive:
                 owner, "input", get_app_config_value("microphone_name_hint", "External Microphone")
             )
             microphone_index = info.get("index")
-            stream = await asyncio.to_thread(owner.open, format=FORMAT, channels=CHANNELS,
+            stream = await audio_io_call(owner.open, format=FORMAT, channels=CHANNELS,
                 rate=SEND_SAMPLE_RATE, input=True, input_device_index=microphone_index,
                 frames_per_buffer=CHUNK_SIZE)
             audio_event("microphone_open", device=info["name"], sample_rate=SEND_SAMPLE_RATE)
@@ -1171,11 +1171,11 @@ class JarvisLive:
                         detector.reset()
                 if self.ui.muted is True or self._paused:
                     if phone_loopback is not None:
-                        await asyncio.to_thread(phone_loopback.stop)
+                        await audio_io_call(phone_loopback.stop)
                         phone_loopback = None
                         audio_event("phone_loopback_closed", reason="muted_or_paused")
                     if stream is not None:
-                        stream.close()
+                        await audio_io_call(stream.close)
                         stream = None
                     clear_queue(self.out_queue)
                     gate.sleep()
@@ -1185,7 +1185,7 @@ class JarvisLive:
                     await asyncio.sleep(0.1)
                     continue
                 if stream is None:
-                    stream = await asyncio.to_thread(owner.open, format=FORMAT, channels=CHANNELS,
+                    stream = await audio_io_call(owner.open, format=FORMAT, channels=CHANNELS,
                         rate=SEND_SAMPLE_RATE, input=True, input_device_index=microphone_index,
                         frames_per_buffer=CHUNK_SIZE)
                 call_mode = phone_call_conversation_active()
@@ -1196,7 +1196,7 @@ class JarvisLive:
                             "speaker_name_hint", "Headphones (Realtek"
                         ),
                     )
-                    if await asyncio.to_thread(candidate.start):
+                    if await audio_io_call(candidate.start):
                         phone_loopback = candidate
                         audio_event("phone_loopback_open", device=phone_loopback.device_name,
                                     sample_rate=SEND_SAMPLE_RATE)
@@ -1213,17 +1213,17 @@ class JarvisLive:
                             level="ERROR",
                         )
                 elif not call_mode and phone_loopback is not None:
-                    await asyncio.to_thread(phone_loopback.stop)
+                    await audio_io_call(phone_loopback.stop)
                     phone_loopback = None
                     audio_event("phone_loopback_closed")
-                data = await asyncio.to_thread(
+                data = await audio_io_call(
                     stream.read, CHUNK_SIZE, exception_on_overflow=False)
                 if phone_loopback is not None:
                     call_audio = phone_loopback.read_latest()
                     if phone_loopback.error:
                         audio_event("phone_loopback_error",
                                     error_type=phone_loopback.error)
-                        await asyncio.to_thread(phone_loopback.stop)
+                        await audio_io_call(phone_loopback.stop)
                         phone_loopback = None
                         phone_call("conversation_stop")
                         self.ui.write_debug(
@@ -1316,10 +1316,10 @@ class JarvisLive:
             raise
         finally:
             if phone_loopback is not None:
-                phone_loopback.stop()
+                await audio_io_call(phone_loopback.stop)
             if stream is not None:
-                stream.close()
-            owner.terminate()
+                await audio_io_call(stream.close)
+            await audio_io_call(owner.terminate)
 
     async def _receive_audio(self):
         print("[JARVIS] 👂 Alım başladı")
@@ -1466,7 +1466,7 @@ class JarvisLive:
             info = choose_local_audio_device(
                 owner, "output", get_app_config_value("speaker_name_hint", "Headphones (Realtek")
             )
-            stream = await asyncio.to_thread(owner.open, format=FORMAT, channels=CHANNELS,
+            stream = await audio_io_call(owner.open, format=FORMAT, channels=CHANNELS,
                 rate=RECV_SAMPLE_RATE, output=True, output_device_index=info.get("index"),
                 frames_per_buffer=512)
             audio_event("speaker_open", device=info["name"], sample_rate=RECV_SAMPLE_RATE)
@@ -1493,7 +1493,7 @@ class JarvisLive:
                     else:
                         try:
                             bridge_info = owner.get_device_info_by_index(bridge_index)
-                            bridge_stream = await asyncio.to_thread(
+                            bridge_stream = await audio_io_call(
                                 owner.open,
                                 format=FORMAT,
                                 channels=CHANNELS,
@@ -1513,16 +1513,16 @@ class JarvisLive:
                             print(f"[JARVIS] ⚠️ Telefon köprüsü açılamadı: {bridge_error}")
                             bridge_retry_at = now + 5.0
                 elif not bridge_enabled and bridge_stream is not None:
-                    await asyncio.to_thread(bridge_stream.close)
+                    await audio_io_call(bridge_stream.close)
                     bridge_stream = None
                     bridge_signal_logged = False
                     audio_event("phone_bridge_closed")
                 self._audio_writing = True
                 self.set_speaking(True)
                 try:
-                    await asyncio.to_thread(stream.write, chunk)
+                    await audio_io_call(stream.write, chunk)
                     if bridge_stream is not None:
-                        await asyncio.to_thread(bridge_stream.write, chunk)
+                        await audio_io_call(bridge_stream.write, chunk)
                         if not bridge_signal_logged:
                             peak = max((abs(sample) for sample in memoryview(chunk).cast("h")), default=0)
                             if peak > 300:
@@ -1539,10 +1539,10 @@ class JarvisLive:
         finally:
             self.set_speaking(False)
             if bridge_stream is not None:
-                bridge_stream.close()
+                await audio_io_call(bridge_stream.close)
             if stream is not None:
-                stream.close()
-            owner.terminate()
+                await audio_io_call(stream.close)
+            await audio_io_call(owner.terminate)
 
     async def run(self):
         # A crash/restart can leave the persistent preference on. Start safely:

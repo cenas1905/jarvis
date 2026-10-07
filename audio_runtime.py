@@ -67,6 +67,25 @@ def clear_queue(queue):
                 break
 
 
+async def audio_io_call(function, *args, **kwargs):
+    """Let native audio I/O finish before TaskGroup cleanup closes its stream.
+
+    Cancelling ``asyncio.to_thread`` cancels only the awaiter; PortAudio keeps
+    running the native read/write call.  Shield the worker and wait for it when
+    a session is cancelled, preventing stream teardown from racing that call.
+    """
+    worker = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        audio_event("audio_io_wait_on_cancel", operation=getattr(function, "__name__", "audio"))
+        try:
+            await asyncio.shield(worker)
+        except BaseException:
+            pass
+        raise
+
+
 def choose_local_audio_device(owner, direction: str, physical_name_hint: str):
     """Keep JARVIS on physical audio when Windows defaults to VB-CABLE."""
     if direction not in {"input", "output"}:
